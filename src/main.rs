@@ -3,11 +3,17 @@ use crossterm::event::read;
 use crossterm::event::{Event, KeyCode};
 use crossterm::terminal::{Clear, ClearType};
 use crossterm::QueueableCommand;
+use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::cmp::min;
 use std::io::prelude::*;
-use std::io::{stdin, stdout};
+use std::io::stdin;
+use std::sync::Mutex;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use unicode_width::UnicodeWidthChar;
+
+static STDOUT: Lazy<Mutex<StandardStream>> =
+    Lazy::new(|| Mutex::new(StandardStream::stdout(ColorChoice::Auto)));
 
 pub enum MoveUnit {
     Line,
@@ -204,14 +210,34 @@ impl Screen {
     }
 
     pub fn draw(&self) {
-        let mut stdout = stdout();
+        let mut stdout = STDOUT.lock().unwrap();
         stdout.queue(MoveTo(0, 0)).unwrap();
         let start = self.current_top as usize;
         let end = min(self.lines.len(), start + self.contents_height());
         debug_assert!(end <= self.lines.len());
         for line in &self.lines[start..end] {
+            let mut segments = vec![];
+            if self.query.is_empty() {
+                segments.push((ColorSpec::new(), &**line));
+            } else {
+                let mut curr_idx = 0;
+                for (next_idx, substr) in line.match_indices(&self.query) {
+                    let normal = &line[curr_idx..next_idx];
+                    let mut match_color = ColorSpec::new();
+                    match_color.set_fg(Some(Color::Red));
+                    segments.push((ColorSpec::new(), normal));
+                    segments.push((match_color, substr));
+                    curr_idx = next_idx + substr.len();
+                }
+                segments.push((ColorSpec::new(), &line[curr_idx..]));
+            };
             stdout.queue(Clear(ClearType::CurrentLine)).unwrap();
-            println!("{}", line);
+            for (spec, segment) in segments {
+                stdout.set_color(&spec).unwrap();
+                write!(stdout, "{}", segment).unwrap();
+                stdout.set_color(&ColorSpec::new()).unwrap();
+            }
+            writeln!(stdout).unwrap();
         }
 
         let message = self
