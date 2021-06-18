@@ -4,6 +4,7 @@ use crossterm::event::{Event, KeyCode};
 use crossterm::terminal::{Clear, ClearType};
 use crossterm::QueueableCommand;
 use once_cell::sync::Lazy;
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::cmp::min;
 use std::io::prelude::*;
@@ -26,7 +27,7 @@ fn main() -> anyhow::Result<()> {
     let mut input = String::new();
     stdin().read_to_string(&mut input).unwrap();
 
-    let (w, h) = match term_size::dimensions_stdout() {
+    let (width, height) = match term_size::dimensions_stdout() {
         Some((w, h)) => (w, h),
         None => {
             eprintln!("(error: Failed to get dimension)");
@@ -35,12 +36,12 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let mut scr = Screen::new(w, h, input);
+    let mut scr = Screen::new(width, height, input);
     loop {
         scr.draw();
 
         match read()? {
-            Event::Resize(width, height) => scr.update_size(width as usize, height as usize),
+            Event::Resize(_, _) => scr.resized(),
             Event::Key(key) => match key.code {
                 KeyCode::Enter | KeyCode::Down | KeyCode::Char('j') => scr.down_by(MoveUnit::Line),
                 KeyCode::Up | KeyCode::Char('k') => scr.up_by(MoveUnit::Line),
@@ -58,9 +59,7 @@ fn main() -> anyhow::Result<()> {
                     scr.update_query(query.clone());
                     loop {
                         match read()? {
-                            Event::Resize(width, height) => {
-                                scr.update_size(width as usize, height as usize)
-                            }
+                            Event::Resize(_, _) => scr.resized(),
                             Event::Key(key) => match key.code {
                                 KeyCode::Enter => {
                                     break;
@@ -106,6 +105,7 @@ pub struct Screen {
     query_mode: bool,
     query: String,
     message: RefCell<Option<String>>,
+    needs_update: Cell<bool>,
 }
 
 impl Screen {
@@ -119,17 +119,26 @@ impl Screen {
             query_mode: false,
             query: String::new(),
             message: RefCell::new(None),
+            needs_update: Cell::new(true),
         };
         scr.recalc_lines();
 
         scr
     }
 
+    pub fn resized(&mut self) {
+        let (width, height) = term_size::dimensions_stdout().unwrap();
+        self.update_size(width as usize, height as usize)
+    }
+
     pub fn update_size(&mut self, width: usize, height: usize) {
+        if self.width == width && self.height == height {
+            return;
+        }
+
         self.width = width;
         self.height = height;
         self.recalc_lines();
-
         self.fix_current_top();
         self.draw();
     }
@@ -217,6 +226,10 @@ impl Screen {
     }
 
     pub fn draw(&self) {
+        if !self.needs_update.get() {
+            return;
+        }
+
         let mut stdout = STDOUT.lock().unwrap();
         stdout.queue(MoveTo(0, 0)).unwrap();
         let start = self.current_top as usize;
@@ -259,28 +272,30 @@ impl Screen {
         stdout.queue(Clear(ClearType::CurrentLine)).unwrap();
         print!("{}{}", if self.query_mode { '/' } else { ':' }, message);
         *self.message.borrow_mut() = None;
+        self.needs_update.set(false);
         stdout.flush().unwrap();
     }
 
     fn contents_height(&self) -> usize {
-        // The last line is `:`
+        // The last line is for prompt `:`
         self.height.saturating_sub(1)
     }
 
     fn recalc_lines(&mut self) {
         self.lines = LineBreaker::new(self.width, &self.contents).collect();
+        self.needs_update.set(true);
     }
 
     fn scroll(&mut self, amount: isize) {
         self.current_top = self.current_top.saturating_add(amount);
         self.fix_current_top();
+        self.needs_update.set(true);
     }
 
     fn fix_current_top(&mut self) {
-        self.current_top = self.current_top.clamp(
-            0,
-            (self.lines.len().saturating_sub(self.contents_height())) as isize,
-        );
+        let max_top = self.lines.len().saturating_sub(self.contents_height());
+        self.current_top = self.current_top.clamp(0, max_top as isize);
+        self.needs_update.set(true);
     }
 }
 
