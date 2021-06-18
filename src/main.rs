@@ -27,6 +27,11 @@ fn main() -> anyhow::Result<()> {
     let mut input = String::new();
     stdin().read_to_string(&mut input).unwrap();
 
+    if input.is_empty() {
+        println!("(error: input was empty)");
+        return Ok(());
+    }
+
     let (width, height) = match term_size::dimensions_stdout() {
         Some((w, h)) => (w, h),
         None => {
@@ -37,6 +42,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut scr = Screen::new(width, height, input);
+    scr.clear();
     loop {
         scr.draw();
 
