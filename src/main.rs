@@ -3,6 +3,7 @@ use crossterm::event::read;
 use crossterm::event::{Event, KeyCode};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use crossterm::terminal::{Clear, ClearType};
+use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::QueueableCommand;
 use once_cell::sync::Lazy;
 use scopeguard::defer;
@@ -45,12 +46,17 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut scr = Screen::new(width, height, input);
-    scr.clear();
 
     // enable raw mode
     enable_raw_mode().unwrap();
     defer! {
         disable_raw_mode().unwrap();
+    }
+
+    // enable alternate screen
+    STDOUT.lock().unwrap().queue(EnterAlternateScreen).unwrap();
+    defer! {
+        STDOUT.lock().unwrap().queue(LeaveAlternateScreen).unwrap();
     }
 
     let mut orig_query = None;
@@ -107,8 +113,6 @@ fn main() -> anyhow::Result<()> {
             }
         }
     }
-
-    scr.clear();
 
     Ok(())
 }
@@ -238,12 +242,6 @@ impl Screen {
                 *self.message.borrow_mut() = Some(format!("failed to find `{}`", self.query));
             }
         }
-    }
-
-    pub fn clear(&self) {
-        let mut stdout = STDOUT.lock().unwrap();
-        stdout.queue(Clear(ClearType::All)).unwrap();
-        stdout.queue(MoveTo(0, 0)).unwrap();
     }
 
     pub fn draw(&self) {
