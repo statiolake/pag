@@ -1,9 +1,11 @@
 use crossterm::cursor::MoveTo;
 use crossterm::event::read;
 use crossterm::event::{Event, KeyCode};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use crossterm::terminal::{Clear, ClearType};
 use crossterm::QueueableCommand;
 use once_cell::sync::Lazy;
+use scopeguard::defer;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::cmp::min;
@@ -44,6 +46,13 @@ fn main() -> anyhow::Result<()> {
 
     let mut scr = Screen::new(width, height, input);
     scr.clear();
+
+    // enable raw mode
+    enable_raw_mode().unwrap();
+    defer! {
+        disable_raw_mode().unwrap();
+    }
+
     let mut orig_query = None;
     loop {
         use self::Event::*;
@@ -100,6 +109,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     scr.clear();
+
     Ok(())
 }
 
