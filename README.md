@@ -8,7 +8,7 @@ First you need to install [Rust](https://www.rust-lang.org/). You can install Ru
 
 After that, clone git repository and you can run:
 
-```
+```console
 > git clone https://github.com/statiolake/pag
 > cargo build
 > some_command | cargo run
@@ -18,7 +18,7 @@ If you want to use this globally, you can install the binary. In the cloned git 
 
 Make sure you have `%USERPROFILE%\.cargo\bin` or `~/.cargo/bin` in your `%PATH%` or `$PATH`. You can use this by calling `pag` anywhere.
 
-```
+```console
 > some_command | pag
 ```
 
@@ -26,7 +26,7 @@ Make sure you have `%USERPROFILE%\.cargo\bin` or `~/.cargo/bin` in your `%PATH%`
 
 Just pipe output to pag. This pager only accepts input from stdin.
 
-```
+```console
 > type foo.txt | pag
 ```
 
@@ -49,3 +49,14 @@ Afer typing `/`, you enter search query setting mode (prompt becomes `/`).
 - (other keys): input character
 
 Although matching string will be highlighted incrementally, the screen doesn't scroll until `n` or `N` is pressed in normal mode.
+
+## Limitations
+
+- On legacy Windows console, vertical resize cannot be not detected (see <https://github.com/crossterm-rs/crossterm/issues/466>).
+- Only UTF-8 input is supported. If you need to handle non-UTF-8 output such as cp932, use tools like iconv, [nkf](https://ja.osdn.net/projects/nkf/), etc to convert the input to UTF-8:
+
+    ```console
+    > help | nkf -w | pag
+    ```
+
+- Colored output is not supported.
