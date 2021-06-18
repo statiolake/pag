@@ -10,6 +10,7 @@ After that, clone git repository and you can run:
 
 ```console
 > git clone https://github.com/statiolake/pag
+> cd pag
 > cargo build
 > some_command | cargo run
 ```
