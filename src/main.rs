@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use std::cmp::min;
 use std::io::prelude::*;
 use std::io::stdin;
+use std::mem::take;
 use std::sync::Mutex;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use unicode_width::UnicodeWidthChar;
@@ -43,58 +44,58 @@ fn main() -> anyhow::Result<()> {
 
     let mut scr = Screen::new(width, height, input);
     scr.clear();
+    let mut orig_query = None;
     loop {
-        scr.draw();
+        use self::Event::*;
+        use self::KeyCode::*;
 
-        match read()? {
-            Event::Resize(_, _) => scr.resized(),
-            Event::Key(key) => match key.code {
-                KeyCode::Enter | KeyCode::Down | KeyCode::Char('j') => scr.down_by(MoveUnit::Line),
-                KeyCode::Up | KeyCode::Char('k') => scr.up_by(MoveUnit::Line),
-                KeyCode::Char(' ') | KeyCode::Char('f') | KeyCode::Char('d') => {
-                    scr.down_by(MoveUnit::HalfPage)
-                }
-                KeyCode::Char('b') | KeyCode::Char('u') => scr.up_by(MoveUnit::HalfPage),
-                KeyCode::Char('g') => scr.up_by(MoveUnit::Entire),
-                KeyCode::Char('G') => scr.down_by(MoveUnit::Entire),
-                KeyCode::Char('q') => break,
-                KeyCode::Char('/') => {
-                    let orig_query = scr.query.clone();
-                    let mut query = String::new();
-                    scr.set_query_mode(true);
-                    scr.update_query(query.clone());
-                    loop {
-                        match read()? {
-                            Event::Resize(_, _) => scr.resized(),
-                            Event::Key(key) => match key.code {
-                                KeyCode::Enter => {
-                                    break;
-                                }
-                                KeyCode::Esc => {
-                                    // restore original query
-                                    scr.update_query(orig_query);
-                                    break;
-                                }
-                                KeyCode::Backspace => {
-                                    let _ = query.pop();
-                                    scr.update_query(query.clone());
-                                }
-                                KeyCode::Char(ch) => {
-                                    query.push(ch);
-                                    scr.update_query(query.clone());
-                                }
-                                _ => {}
-                            },
-                            _ => {}
-                        }
+        scr.draw();
+        if scr.is_query_mode() {
+            // search query mode
+            match read()? {
+                Resize(_, _) => scr.resized(),
+                Key(key) => match key.code {
+                    Enter => {
+                        scr.set_query_mode(false);
                     }
-                    scr.set_query_mode(false);
-                }
-                KeyCode::Char('n') => scr.next(),
-                KeyCode::Char('N') => scr.prev(),
+                    Esc => {
+                        // restore original query. it must be saved hence unwrapping.
+                        *scr.get_query_mut() = orig_query.unwrap();
+                        orig_query = None;
+                        scr.set_query_mode(false);
+                    }
+                    Backspace => {
+                        let _ = scr.get_query_mut().pop();
+                    }
+                    Char(ch) => {
+                        scr.get_query_mut().push(ch);
+                    }
+                    _ => {}
+                },
                 _ => {}
-            },
-            _ => {}
+            }
+        } else {
+            // Normal mode
+            match read()? {
+                Resize(_, _) => scr.resized(),
+                Key(key) => match key.code {
+                    Enter | Down | Char('j') => scr.down_by(MoveUnit::Line),
+                    Up | Char('k') => scr.up_by(MoveUnit::Line),
+                    Char(' ' | 'f' | 'd') => scr.down_by(MoveUnit::HalfPage),
+                    Char('b' | 'u') => scr.up_by(MoveUnit::HalfPage),
+                    Char('g') => scr.up_by(MoveUnit::Entire),
+                    Char('G') => scr.down_by(MoveUnit::Entire),
+                    Char('q') => break,
+                    Char('/') => {
+                        orig_query = Some(take(scr.get_query_mut()));
+                        scr.set_query_mode(true);
+                    }
+                    Char('n') => scr.next(),
+                    Char('N') => scr.prev(),
+                    _ => {}
+                },
+                _ => {}
+            }
         }
     }
 
@@ -146,22 +147,24 @@ impl Screen {
         self.height = height;
         self.recalc_lines();
         self.fix_current_top();
-        self.draw();
     }
 
     pub fn get_query(&self) -> &str {
         &self.query
     }
 
+    pub fn get_query_mut(&mut self) -> &mut String {
+        self.needs_update.set(true);
+        &mut self.query
+    }
+
+    pub fn is_query_mode(&self) -> bool {
+        self.query_mode
+    }
+
     pub fn set_query_mode(&mut self, mode: bool) {
         self.needs_update.set(true);
         self.query_mode = mode;
-    }
-
-    pub fn update_query(&mut self, query: String) {
-        self.query = query;
-        self.needs_update.set(true);
-        self.draw();
     }
 
     pub fn up_by(&mut self, unit: MoveUnit) {
