@@ -93,6 +93,7 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    scr.clear();
     Ok(())
 }
 
@@ -209,6 +210,12 @@ impl Screen {
         }
     }
 
+    pub fn clear(&self) {
+        let mut stdout = STDOUT.lock().unwrap();
+        stdout.queue(Clear(ClearType::All)).unwrap();
+        stdout.queue(MoveTo(0, 0)).unwrap();
+    }
+
     pub fn draw(&self) {
         let mut stdout = STDOUT.lock().unwrap();
         stdout.queue(MoveTo(0, 0)).unwrap();
@@ -246,6 +253,9 @@ impl Screen {
             .as_ref()
             .cloned()
             .unwrap_or_else(|| self.query.clone());
+        stdout
+            .queue(MoveTo(0, self.contents_height() as u16))
+            .unwrap();
         stdout.queue(Clear(ClearType::CurrentLine)).unwrap();
         print!("{}{}", if self.query_mode { '/' } else { ':' }, message);
         *self.message.borrow_mut() = None;
