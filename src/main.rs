@@ -148,11 +148,13 @@ impl Screen {
     }
 
     pub fn set_query_mode(&mut self, mode: bool) {
+        self.needs_update.set(true);
         self.query_mode = mode;
     }
 
     pub fn update_query(&mut self, query: String) {
         self.query = query;
+        self.needs_update.set(true);
         self.draw();
     }
 
