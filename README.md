@@ -53,7 +53,6 @@ Although matching string will be highlighted incrementally, the screen doesn't s
 
 ## Limitations
 
-- On legacy Windows console, vertical resize cannot be not detected (see <https://github.com/crossterm-rs/crossterm/issues/466>).
 - Only UTF-8 input is supported. If you need to handle non-UTF-8 output such as cp932, use tools like iconv, [nkf](https://ja.osdn.net/projects/nkf/), etc to convert the input to UTF-8:
 
     ```console
