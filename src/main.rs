@@ -10,6 +10,8 @@ use scopeguard::defer;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::cmp::min;
+use std::env::args;
+use std::fs::read_to_string;
 use std::io::prelude::*;
 use std::io::stdin;
 use std::mem::take;
@@ -27,9 +29,19 @@ pub enum MoveUnit {
 }
 
 fn main() -> anyhow::Result<()> {
-    // Read entire input
-    let mut input = String::new();
-    stdin().read_to_string(&mut input).unwrap();
+    // Read entire input. You can pass the file path as an argument. If it was `-` or not specified,
+    // the input is read from stdin.
+    let input = {
+        let file_path = args().nth(1).filter(|n| n != "-");
+        match file_path {
+            Some(path) => read_to_string(path)?,
+            None => {
+                let mut buf = String::new();
+                stdin().read_to_string(&mut buf)?;
+                buf
+            }
+        }
+    };
 
     if input.is_empty() {
         println!("(error: input was empty)");

@@ -25,10 +25,16 @@ Make sure you have `%USERPROFILE%\.cargo\bin` or `~/.cargo/bin` in your `%PATH%`
 
 ## Usage
 
-Just pipe output to pag. This pager only accepts input from stdin.
+Just pipe output to pag, or specify the file path by the argument.
 
 ```console
 > type foo.txt | pag
+```
+
+or
+
+```console
+> pag foo.txt
 ```
 
 In this pager, you can use these commands in normal mode (when prompt is `:`):
@@ -55,8 +61,8 @@ Although matching string will be highlighted incrementally, the screen doesn't s
 
 - Only UTF-8 input is supported. If you need to handle non-UTF-8 output such as cp932, use tools like iconv, [nkf](https://ja.osdn.net/projects/nkf/), etc to convert the input to UTF-8:
 
-    ```console
-    > help | nkf -w | pag
-    ```
+  ```console
+  > help | nkf -w | pag
+  ```
 
 - Colored output is not supported.
