@@ -1,4 +1,7 @@
+use crossterm::cursor::Hide;
 use crossterm::cursor::MoveTo;
+use crossterm::cursor::MoveToNextLine;
+use crossterm::cursor::Show;
 use crossterm::event::read;
 use crossterm::event::{Event, KeyCode};
 use crossterm::queue;
@@ -287,11 +290,13 @@ impl Screen {
             .collect();
 
         // enqueue commands
-        for (no, segments) in line_segments.iter().enumerate() {
-            queue!(stdout, MoveTo(0, no as u16), Clear(ClearType::CurrentLine)).unwrap();
+        queue!(stdout, Hide, MoveTo(0, 0)).unwrap();
+        for segments in line_segments {
+            stdout.queue(Clear(ClearType::CurrentLine)).unwrap();
             for segment in segments {
-                stdout.queue(PrintStyledContent(*segment)).unwrap();
+                stdout.queue(PrintStyledContent(segment)).unwrap();
             }
+            stdout.queue(MoveToNextLine(1)).unwrap();
         }
 
         let message = self
@@ -308,7 +313,8 @@ impl Screen {
                 "{}{}",
                 if self.query_mode { '/' } else { ':' },
                 message
-            ))
+            )),
+            Show
         )
         .unwrap();
 
