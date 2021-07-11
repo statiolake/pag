@@ -1,17 +1,13 @@
-use crossterm::cursor::Hide;
-use crossterm::cursor::MoveTo;
-use crossterm::cursor::MoveToNextLine;
-use crossterm::cursor::Show;
-use crossterm::event::read;
-use crossterm::event::{Event, KeyCode};
+use crossterm::cursor::{Hide, MoveTo, Show};
+use crossterm::event::{read, Event, KeyCode};
 use crossterm::queue;
 use crossterm::style::{Color, Print, PrintStyledContent, Stylize};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use crossterm::terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen,
+};
 use crossterm::QueueableCommand;
 use scopeguard::defer;
-use std::cell::Cell;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::cmp::min;
 use std::env::args;
 use std::fs::read_to_string;
@@ -296,7 +292,13 @@ impl Screen {
             for segment in segments {
                 stdout.queue(PrintStyledContent(segment)).unwrap();
             }
-            stdout.queue(MoveToNextLine(1)).unwrap();
+
+            // seems bit flicker-less (why?)
+            if cfg!(windows) {
+                stdout.queue(Print('\n')).unwrap();
+            } else {
+                stdout.queue(Print("\r\n")).unwrap();
+            }
         }
 
         let message = self
